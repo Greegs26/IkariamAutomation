@@ -12,6 +12,8 @@ from pathlib import Path # Modern way to work with file paths
 from watchdog.observers import Observer # Third-party library that watches for file changes (like when you save a .py file)
 from watchdog.events import FileSystemEventHandler
 
+from command_listener import start_command_listener
+
 # ===== LOGGING SETUP =====
 # TODO: Set up logging configuration
 # Needed for automatic reloading of newer version of currently edited .py files.
@@ -64,7 +66,4 @@ for i in range(1, num_sessions + 1):
     drivers[str(i)] = driver
     print(f"Session {i} is ready.")
 
-if __name__ == "__main__":
-    # TODO: Call main() function
-    pass
-
+start_command_listener(drivers)
