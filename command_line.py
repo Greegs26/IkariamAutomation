@@ -120,21 +120,9 @@ observer.start()
 
 controller = AutomationController(driver, module_manager)
 
-try:
-    print("\nScript is running. Press Ctrl+C to exit.")
-    controller.run()
+print("\nScript is running. Type 'help' for commands.")
+controller.run()
 
-    while running:
-        time.sleep(1)
-
-except KeyboardInterrupt:
-    print("\nExiting and closing browser...")
-    running = False
-    driver.quit()
-
-    print("Stopping file watcher...")
-    observer.stop()
-    observer.join()
-
-    print("Program exited cleanly.")
-    sys.exit(0)
+# Keep the main loop alive until 'quit' sets running = False
+while running:
+    time.sleep(1)
