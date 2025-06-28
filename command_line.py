@@ -12,8 +12,11 @@ from pathlib import Path # Modern way to work with file paths
 from watchdog.observers import Observer # Third-party library that watches for file changes (like when you save a .py file)
 from watchdog.events import FileSystemEventHandler
 
-# ===== CUSTOM MODULES =====
-from command_listener import start_command_listener
+running = True
+
+def set_running_flag(value):
+    global running
+    running = value
 
 # ===== FILE WATCHER CLASS =====
 # TODO: Create class to watch for changes in .py files
@@ -24,8 +27,9 @@ class ReloadHandler(FileSystemEventHandler):
 
     def on_modified(self, event):
         if event.src_path.endswith(".py"):
-            logging.info(f"Detected change in: {event.src_path}")
-            self.module_manager.reload_all_modules()
+            filename = Path(event.src_path).stem  # Extracts filename without extension
+            logging.info(f"Detected change in: {filename}")
+            self.module_manager.reload_module(filename)
 
 # ===== MODULE MANAGER CLASS =====
 # TODO: Create class to load/reload modules and manage functions
@@ -46,6 +50,16 @@ class ModuleManager:
                 logging.info(f"Reloaded module: {name}")
             except Exception as e:
                 logging.error(f"Failed to reload {name}: {e}")
+                
+    def reload_module(self, name):
+        if name in self.modules:
+            try:
+                importlib.reload(self.modules[name])
+                logging.info(f"Reloaded module: {name}")
+            except Exception as e:
+                logging.error(f"Failed to reload {name}: {e}")
+        else:
+            logging.warning(f"Module {name} not managed, skipping reload.")
 
 # ===== MAIN CONTROLLER CLASS =====
 # TODO: Create main controller that runs the automation
@@ -57,22 +71,6 @@ class AutomationController:
     def run(self):
         # You can customize this later to call specific bot functions
         logging.info("Automation controller is running...")
-
-# ===== CONFIGURATION =====
-# TODO: Define what modules to load and what functions to run
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
-modules_to_watch = ["command_listener"]  # Add other modules here
-
-module_manager = ModuleManager(modules_to_watch)
-module_manager.load_modules()
-
-event_handler = ReloadHandler(module_manager)
-observer = Observer()
-observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
-observer.start()
-
-controller = AutomationController(driver, module_manager)
 
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
@@ -92,13 +90,37 @@ driver = webdriver.Firefox(options=options)
 driver.get("https://ikariam.org")
 print(f"Session is ready.")
 
+# ===== CONFIGURATION =====
+# TODO: Define what modules to load and what functions to run
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+modules_to_watch = ["command_listener"]  # Add other modules here
+
+module_manager = ModuleManager(modules_to_watch)
+module_manager.load_modules()
+
+event_handler = ReloadHandler(module_manager)
+observer = Observer()
+observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
+observer.start()
+
+controller = AutomationController(driver, module_manager)
+
 try:
     print("\nScript is running. Press Ctrl+C to exit.")
     controller.run()
-    while True:
+
+    while running:
         time.sleep(1)
+
 except KeyboardInterrupt:
     print("\nExiting and closing browser...")
+    running = False
+    driver.quit()
+
+    print("Stopping file watcher...")
     observer.stop()
     observer.join()
-    driver.quit()
+
+    print("Program exited cleanly.")
+    sys.exit(0)
