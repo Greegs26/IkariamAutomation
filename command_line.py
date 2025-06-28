@@ -19,7 +19,7 @@ def set_running_flag(value):
     running = value
 
 def discover_modules(folder="commands"):
-    return [f.stem for f in Path(folder).glob("*.py") if f.name != "__init__.py"]
+    return [f"{folder}.{f.stem}" for f in Path(folder).glob("*.py") if f.name != "__init__.py"]
 
 # ===== FILE WATCHER CLASS =====
 # TODO: Create class to watch for changes in .py files
@@ -74,19 +74,10 @@ class AutomationController:
 
     def run(self):
         import command_listener
-        import close_session
-
         logging.info("Automation controller is running...")
 
-        command_map = {
-            "quit": lambda: close_session.quit(self.driver, self.observer, set_running_flag),
-        }
-
-        print("\nAvailable commands:")
-        for cmd in command_map:
-            print(f" - {cmd}")
-
-        command_listener.start(command_map)
+        # Just pass the context to command_listener
+        command_listener.start(self.driver, self.observer, self.module_manager, set_running_flag)
 
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
@@ -95,36 +86,41 @@ from selenium.webdriver.firefox.options import Options
 # OPTIONAL: specify path to geckodriver if not in PATH
 # service = Service(executable_path="/path/to/geckodriver")
 
-# Setup Firefox options
-options = Options()
-options.set_preference("dom.webnotifications.enabled", False)  # Disable popups
-options.set_preference("dom.webdriver.enabled", False) # Hides navigator.webdriver
+def main():
+    # Setup Firefox options
+    options = Options()
+    options.set_preference("dom.webnotifications.enabled", False)  # Disable popups
+    options.set_preference("dom.webdriver.enabled", False) # Hides navigator.webdriver
 
-# Launch driver
-print(f"\nLaunching session...")
-driver = webdriver.Firefox(options=options)
-driver.get("https://ikariam.org")
-print(f"Session is ready.")
+    # Launch driver
+    print(f"\nLaunching session...")
+    driver = webdriver.Firefox(options=options)
+    driver.get("https://ikariam.org")
+    print(f"Session is ready.")
 
-# ===== CONFIGURATION =====
-# TODO: Define what modules to load and what functions to run
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+    # ===== CONFIGURATION =====
+    # TODO: Define what modules to load and what functions to run
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-modules_to_watch = ["command_listener"] + discover_modules("commands")
+    modules_to_watch = ["command_listener"] + discover_modules("commands")
+    print("Modules to watch:", modules_to_watch)
 
-module_manager = ModuleManager(modules_to_watch)
-module_manager.load_modules()
+    module_manager = ModuleManager(modules_to_watch)
+    module_manager.load_modules()
 
-event_handler = ReloadHandler(module_manager)
-observer = Observer()
-observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
-observer.start()
+    event_handler = ReloadHandler(module_manager)
+    observer = Observer()
+    observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
+    observer.start()
 
-controller = AutomationController(driver, module_manager, observer)
+    controller = AutomationController(driver, module_manager, observer)
 
-print("\nScript is running. Type 'help' for commands.")
-controller.run()
+    print("\nScript is running. Type 'help' for commands.")
+    controller.run()
 
-# Keep the main loop alive until 'quit' sets running = False
-while running:
-    time.sleep(1)
+    # Keep the main loop alive until 'quit' sets running = False
+    while running:
+        time.sleep(1)
+
+    if __name__ == "__main__":
+        main()
