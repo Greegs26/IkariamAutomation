@@ -18,6 +18,9 @@ def set_running_flag(value):
     global running
     running = value
 
+def discover_modules(folder="commands"):
+    return [f.stem for f in Path(folder).glob("*.py") if f.name != "__init__.py"]
+
 # ===== FILE WATCHER CLASS =====
 # TODO: Create class to watch for changes in .py files
 # Needed for automatic reloading of newer version of currently edited .py files.
@@ -97,7 +100,7 @@ options = Options()
 options.set_preference("dom.webnotifications.enabled", False)  # Disable popups
 options.set_preference("dom.webdriver.enabled", False) # Hides navigator.webdriver
 
-# Launch dirver
+# Launch driver
 print(f"\nLaunching session...")
 driver = webdriver.Firefox(options=options)
 driver.get("https://ikariam.org")
@@ -107,7 +110,7 @@ print(f"Session is ready.")
 # TODO: Define what modules to load and what functions to run
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-modules_to_watch = ["command_listener"]  # Add other modules here
+modules_to_watch = ["command_listener"] + discover_modules("commands")
 
 module_manager = ModuleManager(modules_to_watch)
 module_manager.load_modules()
