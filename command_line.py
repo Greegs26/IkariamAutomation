@@ -69,8 +69,22 @@ class AutomationController:
         self.module_manager = module_manager
 
     def run(self):
-        # You can customize this later to call specific bot functions
+        import command_listener
+        #import bot_actions
+
         logging.info("Automation controller is running...")
+
+        command_map = {
+            #"collect": lambda: bot_actions.collect_resources(self.driver),
+            #"gold": lambda: bot_actions.click_gold(self.driver),
+            "quit": lambda: set_running_flag(False),
+        }
+
+        print("\nAvailable commands:")
+        for cmd in command_map:
+            print(f" - {cmd}")
+
+        command_listener.start(command_map)
 
 from selenium import webdriver
 from selenium.webdriver.firefox.service import Service
