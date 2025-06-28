@@ -1,18 +1,19 @@
 import sys
 
-def graceful_shutdown(driver, observer, set_running_flag):
-    print("\n[close_session] Shutting down session...")
+def quit(driver, observer, set_running_flag):
+    print("\n[quit] Shutting down browser and exiting...")
+
     try:
         driver.quit()
     except Exception as e:
-        print(f"Error while closing browser: {e}")
+        print(f"Error closing browser: {e}")
 
     try:
         observer.stop()
         observer.join()
     except Exception as e:
-        print(f"Error while stopping observer: {e}")
+        print(f"Error stopping file watcher: {e}")
 
     set_running_flag(False)
-    print("Program exited cleanly.")
+    print("Exited cleanly.")
     sys.exit(0)
