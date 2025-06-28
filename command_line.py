@@ -64,20 +64,19 @@ class ModuleManager:
 # ===== MAIN CONTROLLER CLASS =====
 # TODO: Create main controller that runs the automation
 class AutomationController:
-    def __init__(self, driver, module_manager):
+    def __init__(self, driver, module_manager, observer):
         self.driver = driver
         self.module_manager = module_manager
+        self.observer = observer
 
     def run(self):
         import command_listener
-        #import bot_actions
+        import close_session
 
         logging.info("Automation controller is running...")
 
         command_map = {
-            #"collect": lambda: bot_actions.collect_resources(self.driver),
-            #"gold": lambda: bot_actions.click_gold(self.driver),
-            "quit": lambda: set_running_flag(False),
+            "quit": lambda: close_session.quit(self.driver, self.observer, set_running_flag),
         }
 
         print("\nAvailable commands:")
@@ -118,7 +117,7 @@ observer = Observer()
 observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
 observer.start()
 
-controller = AutomationController(driver, module_manager)
+controller = AutomationController(driver, module_manager, observer)
 
 print("\nScript is running. Type 'help' for commands.")
 controller.run()
