@@ -34,8 +34,9 @@ class ReloadHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(".py"):
             filename = Path(event.src_path).stem
-            module_name = None
 
+            # Match full module name (e.g., commands.close_session)
+            module_name = None
             for full_name in self.module_manager.modules:
                 if full_name.endswith(filename):
                     module_name = full_name
@@ -45,15 +46,15 @@ class ReloadHandler(FileSystemEventHandler):
                 logging.info(f"[Watcher] Detected change in: {module_name}")
                 self.module_manager.reload_module(module_name)
 
-                # Only trigger command refresh for command-related modules
+                # Rebuild command map if command_listener has that function
                 if "command_listener" in self.module_manager.modules:
                     import command_listener
                     if hasattr(command_listener, "rebuild_command_map"):
                         command_listener.rebuild_command_map(
                             self.module_manager.modules,
-                            driver,
-                            observer,
-                            set_running_flag
+                            self.driver,
+                            self.observer,
+                            self.set_running_flag
                         )
 
 # ===== MODULE MANAGER CLASS =====
@@ -101,48 +102,48 @@ class AutomationController:
         # Just pass the context to command_listener
         command_listener.start(self.driver, self.observer, self.module_manager, set_running_flag)
 
-from selenium import webdriver
-from selenium.webdriver.firefox.service import Service
-from selenium.webdriver.firefox.options import Options
+#from selenium import webdriver
+#from selenium.webdriver.firefox.service import Service
+#from selenium.webdriver.firefox.options import Options
 
 # OPTIONAL: specify path to geckodriver if not in PATH
 # service = Service(executable_path="/path/to/geckodriver")
 
 def main():
+    from selenium import webdriver
+    from selenium.webdriver.firefox.options import Options
+
     # Setup Firefox options
     options = Options()
-    options.set_preference("dom.webnotifications.enabled", False)  # Disable popups
-    options.set_preference("dom.webdriver.enabled", False) # Hides navigator.webdriver
-
-    # Launch driver
-    print(f"\nLaunching session...")
+    options.set_preference("dom.webnotifications.enabled", False)
+    options.set_preference("dom.webdriver.enabled", False)
+    # Launch browser
     driver = webdriver.Firefox(options=options)
     driver.get("https://ikariam.org")
-    print(f"Session is ready.")
 
-    # ===== CONFIGURATION =====
-    # TODO: Define what modules to load and what functions to run
+    # Logging setup
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
+    # Load modules
     modules_to_watch = ["command_listener"] + discover_modules("commands")
-    print("Modules to watch:", modules_to_watch)
-
     module_manager = ModuleManager(modules_to_watch)
     module_manager.load_modules()
 
-    event_handler = ReloadHandler(module_manager)
+    # Create observer BEFORE using it
     observer = Observer()
+
+    # Now pass everything to the event handler
+    event_handler = ReloadHandler(module_manager, driver, observer, set_running_flag)
+
+    # Setup file watching
     observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
     observer.start()
 
+    # Start controller
     controller = AutomationController(driver, module_manager, observer)
+    print("\nScript is running. Type a command:")
 
-    print("\nScript is running. Type 'help' for commands.")
     controller.run()
 
-    # Keep the main loop alive until 'quit' sets running = False
     while running:
         time.sleep(1)
-
-    if __name__ == "__main__":
-        main()
