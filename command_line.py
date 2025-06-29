@@ -25,14 +25,36 @@ def discover_modules(folder="commands"):
 # TODO: Create class to watch for changes in .py files
 # Needed for automatic reloading of newer version of currently edited .py files.
 class ReloadHandler(FileSystemEventHandler):
-    def __init__(self, module_manager):
+    def __init__(self, module_manager, driver, observer, set_running_flag):
         self.module_manager = module_manager
+        self.driver = driver
+        self.observer = observer
+        self.set_running_flag = set_running_flag
 
     def on_modified(self, event):
         if event.src_path.endswith(".py"):
-            filename = Path(event.src_path).stem  # Extracts filename without extension
-            logging.info(f"Detected change in: {filename}")
-            self.module_manager.reload_module(filename)
+            filename = Path(event.src_path).stem
+            module_name = None
+
+            for full_name in self.module_manager.modules:
+                if full_name.endswith(filename):
+                    module_name = full_name
+                    break
+
+            if module_name:
+                logging.info(f"[Watcher] Detected change in: {module_name}")
+                self.module_manager.reload_module(module_name)
+
+                # Only trigger command refresh for command-related modules
+                if "command_listener" in self.module_manager.modules:
+                    import command_listener
+                    if hasattr(command_listener, "rebuild_command_map"):
+                        command_listener.rebuild_command_map(
+                            self.module_manager.modules,
+                            driver,
+                            observer,
+                            set_running_flag
+                        )
 
 # ===== MODULE MANAGER CLASS =====
 # TODO: Create class to load/reload modules and manage functions
