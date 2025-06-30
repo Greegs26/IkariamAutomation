@@ -11,6 +11,7 @@ import logging # Better than just print()
 from pathlib import Path # Modern way to work with file paths
 from watchdog.observers import Observer # Third-party library that watches for file changes (like when you save a .py file)
 from watchdog.events import FileSystemEventHandler
+from threading import Lock
 
 running = True
 
@@ -34,6 +35,7 @@ class ReloadHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(".py"):
             filename = Path(event.src_path).stem
+            print(f"[DEBUG] File changed: {event.src_path}")
 
             # Match full module name (e.g., commands.close_session)
             module_name = None
@@ -45,6 +47,7 @@ class ReloadHandler(FileSystemEventHandler):
             if module_name:
                 logging.info(f"[Watcher] Detected change in: {module_name}")
                 self.module_manager.reload_module(module_name)
+                logging.info(f"[Watcher] Reloaded: {module_name}")
 
                 # Rebuild command map if command_listener has that function
                 if "command_listener" in self.module_manager.modules:
@@ -72,7 +75,7 @@ class ModuleManager:
     def reload_all_modules(self):
         for name in self.modules:
             try:
-                importlib.reload(self.modules[name])
+                self.modules[name] = importlib.reload(self.modules[name])
                 logging.info(f"Reloaded module: {name}")
             except Exception as e:
                 logging.error(f"Failed to reload {name}: {e}")
@@ -109,23 +112,79 @@ class AutomationController:
 # OPTIONAL: specify path to geckodriver if not in PATH
 # service = Service(executable_path="/path/to/geckodriver")
 
+import getpass
+
 def main():
+
     from selenium import webdriver
     from selenium.webdriver.firefox.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
+    selenium_lock = Lock() # going to be needed to queue multiple actions in a row
+    
+    # Prompt for credentials
+    username = input("Enter your username: ")
+    password = getpass.getpass("Enter your password: ")
 
     # Setup Firefox options
     options = Options()
     options.set_preference("dom.webnotifications.enabled", False)
     options.set_preference("dom.webdriver.enabled", False)
+
     # Launch browser
     driver = webdriver.Firefox(options=options)
     driver.get("https://ikariam.org")
+
+    # Click the 'Log in' tab
+    WebDriverWait(driver, 10).until(
+        EC.element_to_be_clickable((By.XPATH, "//li[contains(text(), 'Log in')]"))
+    ).click()
+
+    # Fill in login form
+    WebDriverWait(driver, 10).until(
+        EC.presence_of_element_located((By.NAME, "email"))
+    ).send_keys(username)
+
+    driver.find_element(By.NAME, "password").send_keys(password)
+
+    # Click the login button
+    driver.find_element(By.XPATH, "//button[contains(text(), 'Log in')]").click()
+
+    original_tab = driver.current_window_handle
+    print("[Info] Waiting for you to click a world...")
+
+    # Wait until a new tab opens
+    WebDriverWait(driver, 30).until(lambda d: len(d.window_handles) > 1)
+
+    # Find the new tab and switch to it
+    for handle in driver.window_handles:
+        if handle != original_tab:
+            new_tab_handle = handle
+            break
+
+    # Switch to the new tab
+    driver.switch_to.window(new_tab_handle)
+    print("[Info] Switched to new world tab.")
+
+    # Temporarily skipping original tab close
+    # Close the original login tab
+    # driver.switch_to.window(original_tab)
+    # driver.close()
+    # print("[Info] Closed original login tab.")
+
+    # Switch back to the new tab
+    # driver.switch_to.window(new_tab_handle)
+
+    #### OTHER CODE REQUIRED ####
 
     # Logging setup
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
     # Load modules
     modules_to_watch = ["command_listener"] + discover_modules("commands")
+    print("[DEBUG] Modules to watch:", modules_to_watch)
     module_manager = ModuleManager(modules_to_watch)
     module_manager.load_modules()
 
@@ -136,7 +195,9 @@ def main():
     event_handler = ReloadHandler(module_manager, driver, observer, set_running_flag)
 
     # Setup file watching
-    observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)
+    watch_path = Path.cwd() / "commands"
+    observer.schedule(event_handler, path=str(Path.cwd()), recursive=False)  # For root-level files like command_listener.py
+    observer.schedule(event_handler, path=str(Path.cwd() / "commands"), recursive=False)  # For your dynamic commands
     observer.start()
 
     # Start controller
