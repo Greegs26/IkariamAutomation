@@ -93,17 +93,18 @@ class ModuleManager:
 # ===== MAIN CONTROLLER CLASS =====
 # TODO: Create main controller that runs the automation
 class AutomationController:
-    def __init__(self, driver, module_manager, observer):
+    def __init__(self, driver, module_manager, observer, selenium_lock):
         self.driver = driver
         self.module_manager = module_manager
         self.observer = observer
+        self.selenium_lock = selenium_lock
 
     def run(self):
         import command_listener
         logging.info("Automation controller is running...")
 
         # Just pass the context to command_listener
-        command_listener.start(self.driver, self.observer, self.module_manager, set_running_flag)
+        command_listener.start(self.driver, self.observer, self.module_manager, set_running_flag, self.selenium_lock)
 
 #from selenium import webdriver
 #from selenium.webdriver.firefox.service import Service
@@ -123,7 +124,7 @@ def main():
     from selenium.webdriver.support import expected_conditions as EC
 
     selenium_lock = Lock() # going to be needed to queue multiple actions in a row
-    
+
     # Prompt for credentials
     username = input("Enter your username: ")
     password = getpass.getpass("Enter your password: ")
